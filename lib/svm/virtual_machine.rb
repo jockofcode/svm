@@ -44,7 +44,7 @@ class Svm::VirtualMachine
       value = reg_y.zero? ? immediate_value : @registers[reg_y]
       @registers[reg_x] = value & REGISTER_MASK
     when ADD
-      @registers[reg_x] = (@registers[reg_x] + @registers[reg_y]) & REGISTER_MASK
+      @registers[reg_x] = ((@registers[reg_x] & REGISTER_MASK) + (@registers[reg_y] & REGISTER_MASK)) & REGISTER_MASK
     when SUB
       @registers[reg_x] = (@registers[reg_x] - @registers[reg_y]) & REGISTER_MASK
     when MUL
@@ -52,12 +52,9 @@ class Svm::VirtualMachine
     when DIV
       @registers[reg_x] = (@registers[reg_x] / @registers[reg_y]) & REGISTER_MASK unless @registers[reg_y].zero?
     when LOAD
-      high_byte = @memory[immediate_value]
-      low_byte = @memory[immediate_value + 1]
-      @registers[reg_x] = ((high_byte << 8) | low_byte) & REGISTER_MASK
+      @registers[reg_x] = @memory[immediate_value] & REGISTER_MASK  # Load full 16-bit value
     when STORE
-      @memory[immediate_value] = (@registers[reg_x] >> 8) & 0xFF
-      @memory[immediate_value + 1] = @registers[reg_x] & 0xFF
+      @memory[immediate_value] = @registers[reg_x] & REGISTER_MASK  # Store full 16-bit value
     when JMP
       @PC = immediate_value
       return
@@ -121,7 +118,7 @@ binding.irb if (byte & 0xF0) == false
   end
 
   def combine_opcode_byte(opcode, reg_x, reg_y)
-    ((opcode & 0x0F) << 4) | ((reg_x & 0x03) << 2) | (reg_y & 0x03)
+    ((opcode << 4) & 0xF0) | ((reg_x & 0x03) << 2) | (reg_y & 0x03)
   end
 
   # Modified stack operations for 16-bit values

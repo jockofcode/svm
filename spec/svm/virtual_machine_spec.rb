@@ -42,16 +42,16 @@ RSpec.describe Svm::VirtualMachine do
       program = [
         0x00, 0x00, 0x00, 0x0A,  # MOV R0, #10
         0x04, 0x00, 0x00, 0x0E,  # MOV R1, #14
-        0x10, 0x00, 0x40, 0x00,  # ADD R0, R1
-        0x60, 0x00, 0x00, 0x81,  # STORE 128, R0
-        0xE0, 0x00, 0x00, 0x01,   # INT #1 (print R0)
-        0xF0, 0x00, 0x00, 0x00    # EXTENDED (halt)
+        0x11, 0x00, 0x00, 0x00,  # ADD R0, R1 (0001 0001)
+        0x60, 0x00, 0x00, 0x81,  # STORE R0, 129
+        0xE0, 0x00, 0x00, 0x01,  # INT #1 (print R0)
+        0xF0, 0x00, 0x00, 0x00   # EXTENDED (halt)
       ]
       vm.load_program(program)
     #   vm.debug = true
       
       expect { vm.run }.to output("Output: 24\n").to_stdout
-      expect(vm.instance_variable_get(:@memory)[Svm::VirtualMachine::DISPLAY_START]).to eq(24)
+      expect(vm.instance_variable_get(:@memory)[Svm::VirtualMachine::DISPLAY_START]).to eq(24 & vm.class::REGISTER_MASK)
     end
   end
 
@@ -111,9 +111,7 @@ RSpec.describe Svm::VirtualMachine do
       vm.instance_variable_set(:@registers, [42, 0, 0, 0])
       vm.load_program([vm.combine_opcode_byte(Svm::VirtualMachine::STORE,0,0), 0x00, 0x00, 0x81])  # STORE R0, 129
       vm.send(:execute_instruction)
-      # Check both bytes of the 16-bit value
-      expect(vm.instance_variable_get(:@memory)[129]).to eq(0)    # High byte (42 >> 8) & 0xFF = 0
-      expect(vm.instance_variable_get(:@memory)[130]).to eq(42)   # Low byte  42 & 0xFF = 42
+      expect(vm.instance_variable_get(:@memory)[129]).to eq(42)   # Store full 16-bit value in single location
     end
 
     it 'executes SUB instruction' do
@@ -139,9 +137,7 @@ RSpec.describe Svm::VirtualMachine do
 
     it 'executes LOAD instruction' do
       vm.instance_variable_set(:@memory, Array.new(4096, 0))
-      # Set up a 16-bit value in memory (42 = 0x002A)
-      vm.instance_variable_get(:@memory)[100] = 0x00  # High byte
-      vm.instance_variable_get(:@memory)[101] = 0x2A  # Low byte
+      vm.instance_variable_get(:@memory)[100] = 42  # Store value directly
       vm.load_program([vm.combine_opcode_byte(Svm::VirtualMachine::LOAD,0,0), 0x00, 0x00, 0x64])  # LOAD R0, 100
       vm.send(:execute_instruction)
       expect(vm.instance_variable_get(:@registers)[0]).to eq(42)
@@ -244,7 +240,8 @@ RSpec.describe Svm::VirtualMachine do
       program = [
         0x00, 0x00, 0xFF, 0xFF,  # MOV R0, #65535 (max 16-bit value)
         0x04, 0x00, 0x00, 0x01,  # MOV R1, #1
-        0x10, 0x00, 0x01, 0x00   # ADD R0, R1
+        0x11, 0x00, 0x00, 0x00,  # ADD R0, R1 (0001 0001)
+        0xF0, 0x00, 0x00, 0x00   # EXTENDED (halt)
       ]
       
       vm.load_program(program)
@@ -258,7 +255,8 @@ RSpec.describe Svm::VirtualMachine do
       program = [
         0x00, 0x00, 0x12, 0x34,  # MOV R0, #0x1234
         0x60, 0x00, 0x00, 0x80,  # STORE R0, 128
-        0x50, 0x01, 0x00, 0x80   # LOAD R1, 128
+        0x54, 0x00, 0x00, 0x80,  # LOAD R1, 128  (0101 0100 in binary)
+        0xF0, 0x00, 0x00, 0x00   # EXTENDED (halt)
       ]
       
       vm.load_program(program)
