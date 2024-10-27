@@ -45,7 +45,7 @@ RSpec.describe Svm::VirtualMachine do
         0x11, 0x00, 0x00, 0x00,  # ADD R0, R1 (0001 0001)
         0x60, 0x00, 0x00, 0x81,  # STORE R0, 129
         0xE0, 0x00, 0x00, 0x01,  # INT #1 (print R0)
-        0xF0, 0x00, 0x00, 0x00   # EXTENDED (halt)
+        0xE0, 0x00, 0x00, 0x00   # INT #0 (halt)
       ]
       vm.load_program(program)
     #   vm.debug = true
@@ -57,17 +57,17 @@ RSpec.describe Svm::VirtualMachine do
 
   describe 'stack operations' do
     it 'pushes and pops values correctly' do
-      vm.send(:push, 42)
-      expect(vm.send(:pop)).to eq(42)
+      vm.send(:push_word, 42)
+      expect(vm.send(:pop_word)).to eq(42)
     end
 
     it 'handles multiple push and pop operations' do
-      vm.send(:push, 10)
-      vm.send(:push, 20)
-      vm.send(:push, 30)
-      expect(vm.send(:pop)).to eq(30)
-      expect(vm.send(:pop)).to eq(20)
-      expect(vm.send(:pop)).to eq(10)
+      vm.send(:push_word, 10)
+      vm.send(:push_word, 20)
+      vm.send(:push_word, 30)
+      expect(vm.send(:pop_word)).to eq(30)
+      expect(vm.send(:pop_word)).to eq(20)
+      expect(vm.send(:pop_word)).to eq(10)
     end
   end
 
@@ -178,11 +178,11 @@ RSpec.describe Svm::VirtualMachine do
       vm.load_program([vm.combine_opcode_byte(Svm::VirtualMachine::CALL,0,0),  0x00, 0x04, 0x06])  # CALL 1030
       vm.send(:execute_instruction)
       expect(vm.instance_variable_get(:@PC)).to eq(1030)
-      expect(vm.send(:pop)).to eq(initial_pc + 4)
+      expect(vm.send(:pop_word)).to eq(initial_pc + 4)
     end
 
     it 'executes RET instruction' do
-      vm.send(:push, 3049)
+      vm.send(:push_word, 3049)
       vm.load_program([vm.combine_opcode_byte(Svm::VirtualMachine::RET,0,0), 0x00, 0x00, 0x00])  # RET
       vm.send(:execute_instruction)
       expect(vm.instance_variable_get(:@PC)).to eq(3049)
@@ -192,11 +192,11 @@ RSpec.describe Svm::VirtualMachine do
       vm.instance_variable_set(:@registers, [42, 0, 0, 0])
       vm.load_program([vm.combine_opcode_byte(Svm::VirtualMachine::PUSH,0,0), 0x00, 0x00, 0x00])  # PUSH R0
       vm.send(:execute_instruction)
-      expect(vm.send(:pop)).to eq(42)
+      expect(vm.send(:pop_word)).to eq(42)
     end
 
     it 'executes POP instruction' do
-      vm.send(:push, 42)
+      vm.send(:push_word, 42)
       vm.load_program([vm.combine_opcode_byte(Svm::VirtualMachine::POP,0,0), 0x00, 0x00, 0x00])  # POP R0
       vm.send(:execute_instruction)
       expect(vm.instance_variable_get(:@registers)[0]).to eq(42)
@@ -241,7 +241,7 @@ RSpec.describe Svm::VirtualMachine do
         0x00, 0x00, 0xFF, 0xFF,  # MOV R0, #65535 (max 16-bit value)
         0x04, 0x00, 0x00, 0x01,  # MOV R1, #1
         0x11, 0x00, 0x00, 0x00,  # ADD R0, R1 (0001 0001)
-        0xF0, 0x00, 0x00, 0x00   # EXTENDED (halt)
+        0xE0, 0x00, 0x00, 0x00   # INT #0 (halt)
       ]
       
       vm.load_program(program)
@@ -256,7 +256,7 @@ RSpec.describe Svm::VirtualMachine do
         0x00, 0x00, 0x12, 0x34,  # MOV R0, #0x1234
         0x60, 0x00, 0x00, 0x80,  # STORE R0, 128
         0x54, 0x00, 0x00, 0x80,  # LOAD R1, 128  (0101 0100 in binary)
-        0xF0, 0x00, 0x00, 0x00   # EXTENDED (halt)
+        0xE0, 0x00, 0x00, 0x00   # INT #0 (halt)
       ]
       
       vm.load_program(program)

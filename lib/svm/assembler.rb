@@ -45,14 +45,21 @@ class Svm::Assembler
 
   def second_pass
     @pass_two_code.each do |line, address|
-      tokens = line.split
-      instruction = tokens[0]
-      opcode = OPCODES[instruction]
-      raise "Unknown instruction #{instruction}" if opcode.nil?
+      # Remove any inline comments before processing
+      instruction = line.split(';').first.strip
+      next if instruction.empty?
 
-      reg_x, reg_y, value = parse_operands(tokens[1..], address)
-      @machine_code[address] = combine_opcode_byte(opcode, reg_x, reg_y)
-      @machine_code[address + 1] = 0  # Padding byte
+      parts = instruction.split(/\s*,\s*|\s+/)
+      opcode = parts[0]
+      operands = parts[1..]
+
+      raise "Unknown instruction #{opcode}" unless OPCODES.key?(opcode)
+
+      @current_address = address
+      reg_x, reg_y, value = parse_operands(operands, address)
+      
+      @machine_code[address] = combine_opcode_byte(OPCODES[opcode], reg_x, reg_y)
+      @machine_code[address + 1] = 0x00  # Reserved byte
       @machine_code[address + 2] = (value >> 8) & 0xFF
       @machine_code[address + 3] = value & 0xFF
     end
@@ -79,7 +86,6 @@ class Svm::Assembler
     reg_x = reg_y = value = 0
 
     operands = operands.map { |op| op.gsub(',', '') }
-    puts "operands: #{operands}"
 
     if operands.size == 1
       value = parse_value(operands[0], address)
@@ -96,7 +102,6 @@ class Svm::Assembler
       value = parse_value(operands[2], address)
     end
 
-    puts "reg_x: #{reg_x}, reg_y: #{reg_y}, value: #{value}"
     [reg_x, reg_y, value]
   end
 

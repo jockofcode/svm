@@ -35,7 +35,6 @@ class Svm::VirtualMachine
     instruction_pc = @PC  # Store initial PC value
     instruction = @memory[@PC..@PC + 3]
     opcode_byte = @memory[@PC]
-    binding.irb if debug
     opcode, reg_x, reg_y = split_opcode_byte(opcode_byte)
     immediate_value = (@memory[@PC + 2] << 8) | @memory[@PC + 3]
 
@@ -52,9 +51,9 @@ class Svm::VirtualMachine
     when DIV
       @registers[reg_x] = (@registers[reg_x] / @registers[reg_y]) & REGISTER_MASK unless @registers[reg_y].zero?
     when LOAD
-      @registers[reg_x] = @memory[immediate_value] & REGISTER_MASK  # Load full 16-bit value
+      @registers[reg_x] = @memory[immediate_value] & REGISTER_MASK
     when STORE
-      @memory[immediate_value] = @registers[reg_x] & REGISTER_MASK  # Store full 16-bit value
+      @memory[immediate_value] = @registers[reg_x] & REGISTER_MASK
     when JMP
       @PC = immediate_value
       return
@@ -69,11 +68,11 @@ class Svm::VirtualMachine
         return
       end
     when CALL
-      push(@PC + 4)
+      push_word(@PC + 4)
       @PC = immediate_value
       return
     when RET
-      @PC = pop
+      @PC = pop_word
       return
     when PUSH
       push_word(@registers[reg_x])
@@ -82,7 +81,6 @@ class Svm::VirtualMachine
     when INT
       handle_interrupt(immediate_value)
     when EXTENDED
-      @running = false
       return
     end
 
@@ -91,26 +89,25 @@ class Svm::VirtualMachine
   end
 
   # Stack operations
-  def push(value)
-    push_word(value)  # Use push_word for all stack operations
-  end
-
-  def pop
-    pop_word  # Use pop_word for all stack operations
-  end
-
   # Interrupt handler (basic I/O)
   def handle_interrupt(code)
     case code
+    when 0
+      @running = false
     when 1
       puts "Output: #{@registers[0]}"
+    when 2
+      @memory[@registers[0] & REGISTER_MASK] = getc
+    when 3
+      puts @memory[@registers[0]..@registers[1]]
+    when 4
+      @memory[@registers[0]] = @registers[1] == 0 ? gets(MEMORY_SIZE - @registers[0]).chomp : gets(@registers[1]).chomp
     else
       raise "Unknown interrupt: #{code}"
     end
   end
 
   def split_opcode_byte(byte)
-binding.irb if (byte & 0xF0) == false
     opcode = (byte & 0xF0) >> 4
     reg_x = (byte & 0x0C) >> 2
     reg_y = byte & 0x03
