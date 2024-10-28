@@ -19,7 +19,7 @@ RSpec.describe 'SVM Integration' do
 
       # Run in VM
       vm = Svm::VirtualMachine.new
-      vm.load_program(machine_code)
+      vm.load_program(machine_code,0)
       
       expect { vm.run }.to output("Output: 24\n").to_stdout
     end

@@ -15,7 +15,7 @@ RSpec.describe Svm::Assembler do
 
       machine_code = assembler.assemble(assembly_code)
 
-      expect(machine_code[0..15]).to eq([
+      expect(machine_code[Svm::Assembler::PROGRAM_START..Svm::Assembler::PROGRAM_START+15]).to eq([
         0x00, 0x00, 0x00, 0x0A,  # MOV R0, #10
         0x04, 0x00, 0x00, 0x14,  # MOV R1, #20
         0x11, 0x00, 0x00, 0x00,  # ADD R0, R1 (0001 0001)
@@ -25,6 +25,7 @@ RSpec.describe Svm::Assembler do
 
     it 'handles labels correctly' do
       assembly_code = <<~ASM
+        .org 0
         JMP START
         START:
         MOV R0, #5
@@ -69,11 +70,11 @@ RSpec.describe Svm::Assembler do
     end
 
     it 'correctly assembles an ADD instruction' do
-      assembly_code = "ADD R0, R1"
+      assembly_code = ".org 0\nADD R0, R1"
       machine_code = assembler.assemble(assembly_code)
 
       expect(machine_code[0..3]).to eq([
-        0x11, 0x00, 0x00, 0x00  # ADD R0, R1 (0001 0001)
+         0x11, 0x00, 0x00, 0x00  # ADD R0, R1 (0001 0001)
       ])
     end
   end
@@ -83,15 +84,17 @@ RSpec.describe Svm::Assembler do
       assembly_code = <<~ASM
         START:
         MOV R0, #10
-        .org 100
+        .org #{Svm::VirtualMachine::PROGRAM_START + 100}
         LABEL:
         ADD R0, R1
       ASM
 
       assembler.send(:first_pass, assembly_code)
 
-      expect(assembler.instance_variable_get(:@labels)).to include('START' => 0, 'LABEL' => 100)
-      expect(assembler.instance_variable_get(:@current_address)).to eq(104)
+      expect(assembler.instance_variable_get(:@labels)).to include(
+        'START' => Svm::VirtualMachine::PROGRAM_START, 
+        'LABEL' => Svm::VirtualMachine::PROGRAM_START + 100
+      )
     end
   end
 

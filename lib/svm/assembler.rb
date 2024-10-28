@@ -1,5 +1,10 @@
+require_relative 'virtual_machine'
+
 class Svm::Assembler
   MOV, ADD, SUB, MUL, DIV, LOAD, STORE, JMP, JEQ, JNE, CALL, RET, PUSH, POP, INT, EXTENDED = (0..15).to_a
+
+  # Add constant to match VM's program start
+  PROGRAM_START = Svm::VirtualMachine::PROGRAM_START
 
   OPCODES = {
     'MOV' => MOV, 'ADD' => ADD, 'SUB' => SUB, 'MUL' => MUL, 'DIV' => DIV,
@@ -11,8 +16,8 @@ class Svm::Assembler
 
   def initialize
     @labels = {}
-    @machine_code = Array.new(4096, 0) # Pre-fill with 0s to accommodate ROM and program
-    @current_address = 0
+    @machine_code = Array.new(4096, 0)
+    @current_address = PROGRAM_START  # Start at program start address
     @pass_two_code = []
   end
 
@@ -24,45 +29,80 @@ class Svm::Assembler
 
   def first_pass(assembly_code)
     assembly_code.each_line do |line|
-      line = line.strip
-      next if line.empty? || line.start_with?(';')
-
-      if line.match?(/^[\w]+:/)
-        label = line[0..-2].strip
-        @labels[label] = @current_address
-        next
-      end
-
-      tokens = line.split
-      if tokens[0].start_with?('.')
-        process_directive(tokens)
-      else
-        @pass_two_code << [line, @current_address]
-        @current_address += 4
-      end
+      process_line(line.strip)
     end
+  end
+
+  def process_line(line)
+    return if skip_line?(line)
+    return process_label(line) if label_line?(line)
+    process_code_line(line)
+  end
+
+  def process_code_line(line)
+    tokens = line.split
+    return process_directive(tokens) if directive_line?(tokens)
+    process_instruction(line)
+  end
+
+  def skip_line?(line)
+    line.empty? || line.start_with?(';')
+  end
+
+  def label_line?(line)
+    line.match?(/^[\w]+:/)
+  end
+
+  def process_label(line)
+    label = line.split(':').first.strip
+    @labels[label] = @current_address
+  end
+
+  def directive_line?(tokens)
+    tokens[0].start_with?('.')
+  end
+
+  def process_instruction(line)
+    @pass_two_code << [line, @current_address]
+    @current_address += 4
   end
 
   def second_pass
     @pass_two_code.each do |line, address|
-      # Remove any inline comments before processing
-      instruction = line.split(';').first.strip
+      instruction = extract_instruction(line)
       next if instruction.empty?
 
-      parts = instruction.split(/\s*,\s*|\s+/)
-      opcode = parts[0]
-      operands = parts[1..]
-
-      raise "Unknown instruction #{opcode}" unless OPCODES.key?(opcode)
-
       @current_address = address
-      reg_x, reg_y, value = parse_operands(operands, address)
-      
-      @machine_code[address] = combine_opcode_byte(OPCODES[opcode], reg_x, reg_y)
-      @machine_code[address + 1] = 0x00  # Reserved byte
-      @machine_code[address + 2] = (value >> 8) & 0xFF
-      @machine_code[address + 3] = value & 0xFF
+      generate_machine_code(instruction, address)
     end
+  end
+
+  def extract_instruction(line)
+    line.split(';').first.strip
+  end
+
+  def generate_machine_code(instruction, address)
+    opcode, operands = parse_instruction(instruction)
+    validate_opcode!(opcode)
+    
+    reg_x, reg_y, value = parse_operands(operands, address)
+    write_instruction_to_memory(address, opcode, reg_x, reg_y, value)
+  end
+
+  def parse_instruction(instruction)
+    parts = instruction.split(/\s*,\s*|\s+/)
+    [parts[0], parts[1..]]
+  end
+
+  def validate_opcode!(opcode)
+    raise "Unknown instruction #{opcode}" unless OPCODES.key?(opcode)
+  end
+
+  def write_instruction_to_memory(address, opcode, reg_x, reg_y, value)
+    @machine_code[address] = combine_opcode_byte(OPCODES[opcode], reg_x, reg_y)
+    @machine_code[address + 1] = 0x00  # Reserved byte
+    @machine_code[address + 2] = (value >> 8) & 0xFF
+    @machine_code[address + 3] = value & 0xFF
   end
 
   def process_directive(tokens)
@@ -153,4 +193,3 @@ RESULT:
   machine_code = assembler.assemble(assembly_code)
   puts "Machine Code: #{machine_code.compact.map { |byte| byte.to_s(16).rjust(2, '0') }}"
 end
-

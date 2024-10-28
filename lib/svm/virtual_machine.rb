@@ -1,30 +1,34 @@
 class Svm::VirtualMachine 
   # Constants for memory size and instruction codes
   MEMORY_SIZE = 4096
-  DISPLAY_START = 129
+  DISPLAY_START = 128
   PROGRAM_START = 2048
   REGISTER_MASK = 0xFFFF  # 16-bit mask for registers
 
   # Instruction set
   MOV, ADD, SUB, MUL, DIV, LOAD, STORE, JMP, JEQ, JNE, CALL, RET, PUSH, POP, INT, EXTENDED = (0..15).to_a
-  attr_accessor :debug
+  attr_accessor :debug, :memory, :registers, :PC, :SP, :running, :consecutive_mov_r0_0
 
   def initialize
+    @memory_size = MEMORY_SIZE
+    @display_start = DISPLAY_START
+    @program_start = PROGRAM_START
     @debug = false
-    @memory = Array.new(MEMORY_SIZE, 0)      # Memory array
+    @memory = Array.new(@memory_size, 0)      # Memory array
     @registers = Array.new(4, 0)             # Registers R0..R3 (16-bit each)
-    @PC = PROGRAM_START                      # Program Counter
-    @SP = MEMORY_SIZE - 1                    # Stack Pointer initialized at end of memory
+    @PC = @program_start                      # Program Counter
+    @SP = @memory_size - 1                    # Stack Pointer initialized at end of memory
     @running = true                          # Flag to keep VM running
+    @consecutive_mov_r0_0 = 0               # Counter for consecutive MOV R0, #0
   end
 
   # Load program into memory at a specified address
-  def load_program(program, start_address = PROGRAM_START)
+  def load_program(program, start_address = @program_start)
     program.each_with_index { |byte, index| @memory[start_address + index] = byte }
   end
 
   # Run the VM, fetching and executing instructions
-  def run(start_address = PROGRAM_START)
+  def run(start_address = @program_start)
     @PC = start_address
     while @running
       execute_instruction
@@ -37,6 +41,16 @@ class Svm::VirtualMachine
     opcode_byte = @memory[@PC]
     opcode, reg_x, reg_y = split_opcode_byte(opcode_byte)
     immediate_value = (@memory[@PC + 2] << 8) | @memory[@PC + 3]
+
+    debug_instruction(opcode, reg_x, reg_y, immediate_value)
+
+    # Check for MOV R0, #0
+    if opcode == MOV && reg_x == 0 && reg_y == 0 && immediate_value == 0
+      @consecutive_mov_r0_0 += 1
+      raise "Running blank code detected: MOV R0, #0 executed #{@consecutive_mov_r0_0} times consecutively" if @consecutive_mov_r0_0 > 1
+    else
+      @consecutive_mov_r0_0 = 0
+    end
 
     case opcode
     when MOV
@@ -85,7 +99,7 @@ class Svm::VirtualMachine
     end
 
     @PC += 4 unless @PC != instruction_pc
-    @running = false if @PC >= MEMORY_SIZE
+    @running = false if @PC >= @memory_size
   end
 
   # Stack operations
@@ -101,7 +115,7 @@ class Svm::VirtualMachine
     when 3
       puts @memory[@registers[0]..@registers[1]]
     when 4
-      @memory[@registers[0]] = @registers[1] == 0 ? gets(MEMORY_SIZE - @registers[0]).chomp : gets(@registers[1]).chomp
+      @memory[@registers[0]] = @registers[1] == 0 ? gets(@memory_size - @registers[0]).chomp : gets(@registers[1]).chomp
     else
       raise "Unknown interrupt: #{code}"
     end
@@ -131,6 +145,47 @@ class Svm::VirtualMachine
     low_byte = @memory[@SP + 2]
     @SP += 2
     ((high_byte << 8) | low_byte) & REGISTER_MASK
+  end
+
+  def debug_instruction(opcode, reg_x, reg_y, immediate_value)
+    return unless @debug
+  
+    instruction = case opcode
+    when MOV
+      reg_y.zero? ? "MOV R#{reg_x}, ##{immediate_value}" : "MOV R#{reg_x}, R#{reg_y}"
+    when ADD
+      "ADD R#{reg_x}, R#{reg_y}"
+    when SUB
+      "SUB R#{reg_x}, R#{reg_y}"
+    when MUL
+      "MUL R#{reg_x}, R#{reg_y}"
+    when DIV
+      "DIV R#{reg_x}, R#{reg_y}"
+    when LOAD
+      "LOAD R#{reg_x}, #{immediate_value}"
+    when STORE
+      "STORE R#{reg_x}, #{immediate_value}"
+    when JMP
+      "JMP #{immediate_value}"
+    when JEQ
+      "JEQ R#{reg_x}, R#{reg_y}, #{immediate_value}"
+    when JNE
+      "JNE R#{reg_x}, R#{reg_y}, #{immediate_value}"
+    when CALL
+      "CALL #{immediate_value}"
+    when RET
+      "RET"
+    when PUSH
+      "PUSH R#{reg_x}"
+    when POP
+      "POP R#{reg_x}"
+    when INT
+      "INT ##{immediate_value}"
+    else
+      "UNKNOWN"
+    end
+
+    puts "PC: #{@PC.to_s(16).rjust(4, '0')} | #{instruction}"
   end
 end
 

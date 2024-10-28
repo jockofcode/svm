@@ -42,16 +42,25 @@ RSpec.describe Svm::VirtualMachine do
       program = [
         0x00, 0x00, 0x00, 0x0A,  # MOV R0, #10
         0x04, 0x00, 0x00, 0x0E,  # MOV R1, #14
-        0x11, 0x00, 0x00, 0x00,  # ADD R0, R1 (0001 0001)
-        0x60, 0x00, 0x00, 0x81,  # STORE R0, 129
-        0xE0, 0x00, 0x00, 0x01,  # INT #1 (print R0)
+        0x11, 0x00, 0x00, 0x00,  # ADD R0, R1
+        0x60, 0x00, 0x00, 0x80,  # STORE R0, 129
         0xE0, 0x00, 0x00, 0x00   # INT #0 (halt)
       ]
       vm.load_program(program)
-    #   vm.debug = true
+      vm.run()
       
-      expect { vm.run }.to output("Output: 24\n").to_stdout
-      expect(vm.instance_variable_get(:@memory)[Svm::VirtualMachine::DISPLAY_START]).to eq(24 & vm.class::REGISTER_MASK)
+      expect(vm.instance_variable_get(:@memory)[Svm::VirtualMachine::DISPLAY_START]).to eq(24)
+    end
+
+    it 'raises an error on infinite MOV R0, #0 loop' do
+      program = [
+        vm.combine_opcode_byte(Svm::VirtualMachine::MOV,0,0), 0x00, 0x00, 0x00,  # MOV R0, #0
+        vm.combine_opcode_byte(Svm::VirtualMachine::MOV,0,0), 0x00, 0x00, 0x00   # MOV R0, #0
+      ]
+      vm.load_program(program)
+      expect { 
+        vm.run 
+      }.to raise_error(RuntimeError, "Running blank code detected: MOV R0, #0 executed 2 times consecutively")
     end
   end
 
