@@ -1,5 +1,6 @@
 require 'spec_helper'
 require 'svm/virtual_machine'
+require 'fileutils'
 
 RSpec.describe Svm::VirtualMachine do
   let(:vm) { Svm::VirtualMachine.new }
@@ -111,7 +112,8 @@ RSpec.describe Svm::VirtualMachine do
     end
 
     it 'executes JMP instruction' do
-      vm.load_program([vm.combine_opcode_byte(Svm::VirtualMachine::JMP,0,0), 0x00, 0x03, 0x01])  # JMP #769
+      target_offset = 769 - (Svm::VirtualMachine::PROGRAM_START + 4)  # Calculate relative offset
+      vm.load_program([vm.combine_opcode_byte(Svm::VirtualMachine::JMP,0,0), 0x00, (target_offset >> 8) & 0xFF, target_offset & 0xFF])
       vm.send(:execute_instruction)
       expect(vm.instance_variable_get(:@PC)).to eq(769)
     end
@@ -154,23 +156,24 @@ RSpec.describe Svm::VirtualMachine do
 
     it 'executes JEQ instruction when equal' do
       vm.instance_variable_set(:@registers, [5, 5, 0, 0])
-      vm.load_program([vm.combine_opcode_byte(Svm::VirtualMachine::JEQ,0,1),  0x00, 0x04, 0x06])  # JEQ R0, R1, 1030
+      target_offset = 1030 - (Svm::VirtualMachine::PROGRAM_START + 4)  # Calculate relative offset
+      vm.load_program([vm.combine_opcode_byte(Svm::VirtualMachine::JEQ,0,1), 0x00, (target_offset >> 8) & 0xFF, target_offset & 0xFF])
       vm.send(:execute_instruction)
       expect(vm.instance_variable_get(:@PC)).to eq(1030)
     end
 
     it 'executes JEQ instruction when not equal' do
       vm.instance_variable_set(:@registers, [5, 6, 0, 0])
-      expect(vm.instance_variable_get(:@PC)).to eq(Svm::VirtualMachine::PROGRAM_START)
-      vm.load_program([vm.combine_opcode_byte(Svm::VirtualMachine::JEQ,0,1),  0x00, 0x04, 0x06])  # JEQ R0, R1, 1030
+      target_offset = 1029 - (Svm::VirtualMachine::PROGRAM_START + 4)  # Calculate relative offset
+      vm.load_program([vm.combine_opcode_byte(Svm::VirtualMachine::JNE,0,1), 0x00, (target_offset >> 8) & 0xFF, target_offset & 0xFF])
       vm.send(:execute_instruction)
-      expect(vm.instance_variable_get(:@PC)).to eq(Svm::VirtualMachine::PROGRAM_START + 4)
+      expect(vm.instance_variable_get(:@PC)).to eq(1029)
     end
 
     it 'executes JNE instruction when not equal' do
       vm.instance_variable_set(:@registers, [5, 6, 0, 0])
-      expect(vm.instance_variable_get(:@PC)).to eq(Svm::VirtualMachine::PROGRAM_START)
-      vm.load_program([vm.combine_opcode_byte(Svm::VirtualMachine::JNE,0,1),  0x00, 0x04, 0x05])  # JNE R0, R1, 1029
+      target_offset = 1029 - (Svm::VirtualMachine::PROGRAM_START + 4)  # Calculate relative offset
+      vm.load_program([vm.combine_opcode_byte(Svm::VirtualMachine::JNE,0,1), 0x00, (target_offset >> 8) & 0xFF, target_offset & 0xFF])
       vm.send(:execute_instruction)
       expect(vm.instance_variable_get(:@PC)).to eq(1029)
     end
@@ -301,6 +304,46 @@ RSpec.describe Svm::VirtualMachine do
       values = [0xFFFF, 0x1234, 0x5678, 0xABCD]
       values.each { |v| vm.push_word(v) }
       expect(values.reverse.map { vm.pop_word }).to eq(values.reverse)
+    end
+  end
+
+  describe 'relative jumps' do
+    it 'handles forward relative jumps' do
+      # JMP +8 (skip next instruction)
+      program = [
+        vm.combine_opcode_byte(Svm::InstructionSet::MOV, 0, 0), 0x00, 0x00, 0x0A,   # MOV R0, #10
+        vm.combine_opcode_byte(Svm::InstructionSet::JMP, 0, 0), 0x00, 0x00, 0x04,   # JMP +4
+        vm.combine_opcode_byte(Svm::InstructionSet::MOV, 0, 0), 0x00, 0x00, 0x14,   # MOV R0, #20 (skipped)
+        vm.combine_opcode_byte(Svm::InstructionSet::INT, 0, 0), 0x00, 0x00, 0x01    # INT #1 (print R0)
+      ]
+      vm.load_program(program)
+      vm.set_instruction_limit(10)
+      expect { vm.run }.to output("Output: 10\n").to_stdout
+    end
+
+    it 'handles backward relative jumps' do
+      # Ensure log directory exists
+      FileUtils.mkdir_p('log')
+      
+      # Create a small loop that counts down R0 from 3 to 0
+      program = [
+        vm.combine_opcode_byte(Svm::InstructionSet::MOV, 0, 0), 0x00, 0x00, 0x03,   # MOV R0, #3
+        vm.combine_opcode_byte(Svm::InstructionSet::INT, 0, 0), 0x00, 0x00, 0x01,   # INT #1 (print R0)
+        vm.combine_opcode_byte(Svm::InstructionSet::MOV, 1, 0), 0x00, 0x00, 0x01,   # MOV R1, #1
+        vm.combine_opcode_byte(Svm::InstructionSet::SUB, 0, 1), 0x00, 0x00, 0x00,   # SUB R0, R1
+        vm.combine_opcode_byte(Svm::InstructionSet::MOV, 1, 0), 0x00, 0x00, 0x00,   # MOV R1, #0
+        vm.combine_opcode_byte(Svm::InstructionSet::JNE, 0, 1), 0x00, 0xFF, 0xEC,   # JNE R0, R1, -20 (jump back to INT)
+        vm.combine_opcode_byte(Svm::InstructionSet::INT, 0, 0), 0x00, 0x00, 0x00    # INT #0 (halt)
+      ]
+      vm.load_program(program)
+      
+      # Set instruction limit to prevent infinite loops
+      vm.set_instruction_limit(50)
+      
+      # Capture the actual output in the expectation
+      expect { 
+        vm.run
+      }.to output("Output: 3\nOutput: 2\nOutput: 1\n").to_stdout
     end
   end
 end

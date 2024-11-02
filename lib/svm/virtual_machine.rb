@@ -3,17 +3,30 @@ require_relative 'instruction_set'
 class Svm::VirtualMachine 
   include Svm::InstructionSet
 
-  attr_accessor :debug, :memory, :registers, :PC, :SP, :running, :consecutive_mov_r0_0
+  attr_accessor :debug, :debug_output, :memory, :registers, :PC, :SP, :running, :consecutive_mov_r0_0
 
   def initialize
     @memory_size = MEMORY_SIZE
     @debug = false
+    @debug_output = $stdout
     @memory = Array.new(@memory_size, 0)
     @registers = Array.new(4, 0)
     @PC = PROGRAM_START
     @SP = MEMORY_SIZE - 1
     @running = true
     @consecutive_mov_r0_0 = 0
+    @instruction_limit = nil
+    @instruction_count = 0
+  end
+
+  def enable_debug(output = $stdout)
+    @debug = true
+    @debug_output = output
+  end
+
+  def disable_debug
+    @debug = false
+    @debug_output = $stdout
   end
 
   # Load program into memory at a specified address
@@ -26,6 +39,12 @@ class Svm::VirtualMachine
     @PC = start_address
     while @running
       execute_instruction
+      @instruction_count += 1
+      
+      if @instruction_limit && @instruction_count >= @instruction_limit
+        @running = false
+        raise "Instruction limit reached: #{@instruction_limit} instructions executed"
+      end
     end
   end
 
@@ -65,17 +84,18 @@ class Svm::VirtualMachine
     when STORE
       @memory[immediate_value] = @registers[reg_x] & REGISTER_MASK
     when JMP
-      @PC = immediate_value
+      @PC = calculate_relative_jump(@PC, immediate_value)
       return
     when JEQ
       if @registers[reg_x] == @registers[reg_y]
-        @PC = immediate_value
+        @PC = calculate_relative_jump(@PC, immediate_value)
         return
       end
     when JNE
       if @registers[reg_x] != @registers[reg_y]
-        @PC = immediate_value
-        return
+        @PC = calculate_relative_jump(@PC, immediate_value)
+      else
+        @PC += 4
       end
     when CALL
       push_word(@PC + 4)
@@ -117,14 +137,14 @@ class Svm::VirtualMachine
 
   def debug_instruction(opcode, reg_x, reg_y, immediate_value)
     return unless @debug
-  
+
     instruction = case opcode
     when MOV
       reg_y.zero? ? "MOV R#{reg_x}, ##{immediate_value}" : "MOV R#{reg_x}, R#{reg_y}"
     when ADD
       "ADD R#{reg_x}, R#{reg_y}"
     when SUB
-      "SUB R#{reg_x}, R#{reg_y}"
+      reg_y.zero? ? "SUB R#{reg_x}, ##{immediate_value}" : "SUB R#{reg_x}, R#{reg_y}"
     when MUL
       "MUL R#{reg_x}, R#{reg_y}"
     when DIV
@@ -134,11 +154,11 @@ class Svm::VirtualMachine
     when STORE
       "STORE R#{reg_x}, #{immediate_value}"
     when JMP
-      "JMP #{immediate_value}"
+      "JMP #{format_relative_jump(immediate_value)}"
     when JEQ
-      "JEQ R#{reg_x}, R#{reg_y}, #{immediate_value}"
+      "JEQ R#{reg_x}, R#{reg_y}, #{format_relative_jump(immediate_value)}"
     when JNE
-      "JNE R#{reg_x}, R#{reg_y}, #{immediate_value}"
+      "JNE R#{reg_x}, R#{reg_y}, #{format_relative_jump(immediate_value)}"
     when CALL
       "CALL #{immediate_value}"
     when RET
@@ -153,7 +173,16 @@ class Svm::VirtualMachine
       "UNKNOWN"
     end
 
-    puts "PC: #{@PC.to_s(16).rjust(4, '0')} | #{instruction}"
+    debug_line = "PC: #{@PC.to_s(16).rjust(4, '0')} | #{instruction} | R0=#{@registers[0]} R1=#{@registers[1]} R2=#{@registers[2]} R3=#{@registers[3]}"
+    
+    case @debug_output
+    when String  # Treat as filename
+      File.open(@debug_output, 'a') { |f| f.puts(debug_line) }
+    when Proc
+      @debug_output.call(debug_line)
+    else  # Assume it's an IO object (like $stdout)
+      @debug_output.puts(debug_line)
+    end
   end
 
   def push_word(value)
@@ -165,6 +194,38 @@ class Svm::VirtualMachine
     value = @memory[@SP] & REGISTER_MASK
     @SP += 1
     value
+  end
+
+  def calculate_relative_jump(current_pc, offset)
+    # Convert unsigned 16-bit to signed using helper method
+    signed_offset = unsigned_to_signed_16bit(offset)
+    # Calculate new PC (current + offset + 4 for instruction size)
+    new_pc = current_pc + signed_offset + 4
+    new_pc
+  end
+
+  def set_instruction_limit(limit)
+    @instruction_limit = limit
+    @instruction_count = 0
+  end
+
+  def clear_instruction_limit
+    @instruction_limit = nil
+    @instruction_count = 0
+  end
+
+  private
+
+  def unsigned_to_signed_16bit(value)
+    # Convert unsigned 16-bit to signed by checking the sign bit
+    # and subtracting 2^16 if it's set
+    (value & 0x7FFF) - (value & 0x8000)
+  end
+
+  def format_relative_jump(offset)
+    # Convert unsigned 16-bit to signed using helper method
+    signed_offset = unsigned_to_signed_16bit(offset)
+    signed_offset >= 0 ? "+#{signed_offset}" : signed_offset.to_s
   end
 end
 

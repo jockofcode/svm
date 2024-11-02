@@ -26,18 +26,23 @@ RSpec.describe Svm::Assembler do
     it 'handles labels correctly' do
       assembly_code = <<~ASM
         .org 0
-        JMP START
+        JMP START       ; Jump forward to START
+        MOV R1, #10    ; This instruction should be skipped
         START:
-        MOV R0, #5
-        JMP START
+        MOV R0, #5     ; This is where we land
+        JMP END        ; Jump forward to END
+        MOV R1, #20    ; This instruction should be skipped
+        END:
+        INT #0         ; Halt
       ASM
 
       machine_code = assembler.assemble(assembly_code)
 
-      expect(machine_code[0..11]).to eq([
-        assembler.combine_opcode_byte(Svm::InstructionSet::JMP, 0, 0), 0x00, 0x00, 0x04,  # JMP START (address 4)
-        assembler.combine_opcode_byte(Svm::InstructionSet::MOV, 0, 0), 0x00, 0x00, 0x05,  # MOV R0, #5
-        assembler.combine_opcode_byte(Svm::InstructionSet::JMP, 0, 0), 0x00, 0x00, 0x04   # JMP START (address 4)
+      expect(machine_code[0..15]).to eq([
+        assembler.combine_opcode_byte(Svm::InstructionSet::JMP, 0, 0), 0x00, 0x00, 0x08,  # JMP +8 (forward to START)
+        assembler.combine_opcode_byte(Svm::InstructionSet::MOV, 1, 0), 0x00, 0x00, 0x0A,  # MOV R1, #10 (skipped)
+        assembler.combine_opcode_byte(Svm::InstructionSet::MOV, 0, 0), 0x00, 0x00, 0x05,  # MOV R0, #5 (START)
+        assembler.combine_opcode_byte(Svm::InstructionSet::JMP, 0, 0), 0x00, 0x00, 0x08   # JMP +8 (forward to END)
       ])
     end
 
@@ -213,6 +218,41 @@ RSpec.describe Svm::Assembler do
       expect(Svm::InstructionSet::MOV).to eq(1)
       expect(Svm::InstructionSet::ADD).to eq(2)
       expect(Svm::InstructionSet::EXTENDED).to eq(15)
+    end
+  end
+
+  describe 'relative jumps' do
+    it 'generates correct forward relative jumps' do
+      assembly_code = <<~ASM
+        .org 0
+        MOV R0, #10
+        JMP FORWARD
+        MOV R0, #20      ; Should be skipped
+        FORWARD:
+        INT #1
+      ASM
+
+      machine_code = assembler.assemble(assembly_code)
+      
+      expect(machine_code[4..7]).to eq([
+        assembler.combine_opcode_byte(Svm::InstructionSet::JMP, 0, 0), 0x00, 0x00, 0x08  # JMP +8 (skip next instruction)
+      ])
+    end
+
+    it 'generates correct backward relative jumps' do
+      assembly_code = <<~ASM
+        .org 0
+        START:
+        MOV R0, #10
+        SUB R0, #1
+        JNE R0, R0, START  ; Jump back to START when R0 != 0
+      ASM
+
+      machine_code = assembler.assemble(assembly_code)
+      
+      expect(machine_code[8..11]).to eq([
+        assembler.combine_opcode_byte(Svm::InstructionSet::JNE, 0, 0), 0x00, 0xFF, 0xF8  # JNE -8 (jump back to START)
+      ])
     end
   end
 end
