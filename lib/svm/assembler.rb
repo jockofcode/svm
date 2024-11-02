@@ -82,14 +82,13 @@ class Svm::Assembler
     opcode, operands = parse_instruction(instruction)
     validate_opcode!(opcode)
     
-    # Look up numeric opcode value
+    @current_instruction = opcode  # Track current instruction
     opcode_value = OPCODE_MAP[opcode]
-    
     reg_x, reg_y, value = parse_operands(operands, address)
+    @current_instruction = nil  # Clear after parsing
     
-    # Use combine_opcode_byte instead of direct byte values
     @machine_code[address] = combine_opcode_byte(opcode_value, reg_x, reg_y)
-    @machine_code[address + 1] = 0x00  # Reserved byte
+    @machine_code[address + 1] = 0x00
     @machine_code[address + 2] = (value >> 8) & 0xFF
     @machine_code[address + 3] = value & 0xFF
   end
@@ -101,6 +100,13 @@ class Svm::Assembler
 
   def validate_opcode!(opcode)
     raise "Unknown instruction #{opcode}" unless OPCODE_MAP.key?(opcode)
+  end
+
+  def write_instruction_to_memory(address, opcode, reg_x, reg_y, value)
+    @machine_code[address] = combine_opcode_byte(opcode, reg_x, reg_y)
+    @machine_code[address + 1] = 0x00  # Reserved byte
+    @machine_code[address + 2] = (value >> 8) & 0xFF
+    @machine_code[address + 3] = value & 0xFF
   end
 
   def process_directive(tokens)
@@ -150,15 +156,23 @@ class Svm::Assembler
   end
 
   def parse_value(operand, address)
-    if operand.start_with?('#')
-      operand[1..-1].to_i
-    elsif operand.match?(/^\d+$/)
-      operand.to_i
-    elsif @labels.key?(operand)
-      @labels[operand]
-    else
-      raise "Undefined label or constant: #{operand}"
+    return operand.to_i if operand =~ /^\d+$/
+    return operand[1..-1].to_i if operand.start_with?('#')
+    
+    if @labels.key?(operand)
+      target_address = @labels[operand]
+      
+      # For jump instructions, calculate relative offset
+      if @current_instruction && [:JMP, :JEQ, :JNE, :CALL].include?(@current_instruction.to_sym)
+        # Calculate offset to skip the entire next instruction
+        offset = target_address - address
+        return offset
+      end
+      
+      return target_address
     end
+    
+    raise "Undefined label or constant: #{operand}"
   end
 end
 
@@ -181,7 +195,7 @@ START:
 
 RESULT:
   .data 1
-  JMP START
+  INT #0    ; Halt instead of looping
   ASM
 
   machine_code = assembler.assemble(assembly_code)
