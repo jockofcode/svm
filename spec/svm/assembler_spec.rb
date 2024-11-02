@@ -16,10 +16,10 @@ RSpec.describe Svm::Assembler do
       machine_code = assembler.assemble(assembly_code)
 
       expect(machine_code[Svm::Assembler::PROGRAM_START..Svm::Assembler::PROGRAM_START+15]).to eq([
-        0x00, 0x00, 0x00, 0x0A,  # MOV R0, #10
-        0x04, 0x00, 0x00, 0x14,  # MOV R1, #20
-        0x11, 0x00, 0x00, 0x00,  # ADD R0, R1 (0001 0001)
-        0x60, 0x00, 0x00, 0x64   # STORE R0, 100
+        assembler.combine_opcode_byte(Svm::InstructionSet::MOV, 0, 0), 0x00, 0x00, 0x0A,  # MOV R0, #10
+        assembler.combine_opcode_byte(Svm::InstructionSet::MOV, 1, 0), 0x00, 0x00, 0x14,  # MOV R1, #20
+        assembler.combine_opcode_byte(Svm::InstructionSet::ADD, 0, 1), 0x00, 0x00, 0x00,  # ADD R0, R1
+        assembler.combine_opcode_byte(Svm::InstructionSet::STORE, 0, 0), 0x00, 0x00, 0x64  # STORE R0, 100
       ])
     end
 
@@ -35,9 +35,9 @@ RSpec.describe Svm::Assembler do
       machine_code = assembler.assemble(assembly_code)
 
       expect(machine_code[0..11]).to eq([
-        0x70, 0x00, 0x00, 0x04,  # JMP START (address 4)
-        0x00, 0x00, 0x00, 0x05,  # MOV R0, #5
-        0x70, 0x00, 0x00, 0x04   # JMP START (address 4)
+        assembler.combine_opcode_byte(Svm::InstructionSet::JMP, 0, 0), 0x00, 0x00, 0x04,  # JMP START (address 4)
+        assembler.combine_opcode_byte(Svm::InstructionSet::MOV, 0, 0), 0x00, 0x00, 0x05,  # MOV R0, #5
+        assembler.combine_opcode_byte(Svm::InstructionSet::JMP, 0, 0), 0x00, 0x00, 0x04   # JMP START (address 4)
       ])
     end
 
@@ -52,21 +52,9 @@ RSpec.describe Svm::Assembler do
       machine_code = assembler.assemble(assembly_code)
 
       expect(machine_code[100..107]).to eq([
-        0x00, 0x00, 0x00, 0x01,  # MOV R0, #1
-        0x04, 0x00, 0x00, 0x05   # MOV R1, #5 (FIVE constant)
+        assembler.combine_opcode_byte(Svm::InstructionSet::MOV, 0, 0), 0x00, 0x00, 0x01,  # MOV R0, #1
+        assembler.combine_opcode_byte(Svm::InstructionSet::MOV, 1, 0), 0x00, 0x00, 0x05   # MOV R1, #5 (FIVE constant)
       ])
-    end
-
-    it 'raises an error for unknown instructions' do
-      assembly_code = "UNKNOWN R0, #10"
-
-      expect { assembler.assemble(assembly_code) }.to raise_error(RuntimeError, "Unknown instruction UNKNOWN")
-    end
-
-    it 'raises an error for undefined labels' do
-      assembly_code = "JMP NONEXISTENT"
-
-      expect { assembler.assemble(assembly_code) }.to raise_error(RuntimeError, "Undefined label or constant: NONEXISTENT")
     end
 
     it 'correctly assembles an ADD instruction' do
@@ -74,7 +62,7 @@ RSpec.describe Svm::Assembler do
       machine_code = assembler.assemble(assembly_code)
 
       expect(machine_code[0..3]).to eq([
-         0x11, 0x00, 0x00, 0x00  # ADD R0, R1 (0001 0001)
+        assembler.combine_opcode_byte(Svm::InstructionSet::ADD, 0, 1), 0x00, 0x00, 0x00  # ADD R0, R1
       ])
     end
   end

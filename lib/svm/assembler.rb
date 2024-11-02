@@ -1,23 +1,20 @@
-require_relative 'virtual_machine'
+require_relative 'instruction_set'
 
 class Svm::Assembler
-  MOV, ADD, SUB, MUL, DIV, LOAD, STORE, JMP, JEQ, JNE, CALL, RET, PUSH, POP, INT, EXTENDED = (0..15).to_a
+  include Svm::InstructionSet
 
-  # Add constant to match VM's program start
-  PROGRAM_START = Svm::VirtualMachine::PROGRAM_START
-
-  OPCODES = {
-    'MOV' => MOV, 'ADD' => ADD, 'SUB' => SUB, 'MUL' => MUL, 'DIV' => DIV,
-    'LOAD' => LOAD, 'STORE' => STORE, 'JMP' => JMP, 'JEQ' => JEQ, 'JNE' => JNE,
-    'CALL' => CALL, 'RET' => RET, 'PUSH' => PUSH, 'POP' => POP, 'INT' => INT, 'EXTENDED' => EXTENDED
-  }
-  
+  # Use constants from InstructionSet instead of VirtualMachine
   REGISTERS = { 'R0' => 0, 'R1' => 1, 'R2' => 2, 'R3' => 3 }
+  
+  # Create hash mapping of instruction names to opcodes
+  OPCODE_MAP = OPCODES.each_with_object({}) do |name, hash| 
+    hash[name] = const_get(name)
+  end
 
   def initialize
+    @machine_code = Array.new(MEMORY_SIZE, 0)
     @labels = {}
-    @machine_code = Array.new(4096, 0)
-    @current_address = PROGRAM_START  # Start at program start address
+    @current_address = PROGRAM_START
     @pass_two_code = []
   end
 
@@ -85,8 +82,16 @@ class Svm::Assembler
     opcode, operands = parse_instruction(instruction)
     validate_opcode!(opcode)
     
+    # Look up numeric opcode value
+    opcode_value = OPCODE_MAP[opcode]
+    
     reg_x, reg_y, value = parse_operands(operands, address)
-    write_instruction_to_memory(address, opcode, reg_x, reg_y, value)
+    
+    # Use combine_opcode_byte instead of direct byte values
+    @machine_code[address] = combine_opcode_byte(opcode_value, reg_x, reg_y)
+    @machine_code[address + 1] = 0x00  # Reserved byte
+    @machine_code[address + 2] = (value >> 8) & 0xFF
+    @machine_code[address + 3] = value & 0xFF
   end
 
   def parse_instruction(instruction)
@@ -95,14 +100,7 @@ class Svm::Assembler
   end
 
   def validate_opcode!(opcode)
-    raise "Unknown instruction #{opcode}" unless OPCODES.key?(opcode)
-  end
-
-  def write_instruction_to_memory(address, opcode, reg_x, reg_y, value)
-    @machine_code[address] = combine_opcode_byte(OPCODES[opcode], reg_x, reg_y)
-    @machine_code[address + 1] = 0x00  # Reserved byte
-    @machine_code[address + 2] = (value >> 8) & 0xFF
-    @machine_code[address + 3] = value & 0xFF
+    raise "Unknown instruction #{opcode}" unless OPCODE_MAP.key?(opcode)
   end
 
   def process_directive(tokens)
@@ -161,10 +159,6 @@ class Svm::Assembler
     else
       raise "Undefined label or constant: #{operand}"
     end
-  end
-
-  def combine_opcode_byte(opcode, reg_x, reg_y)
-    ((opcode << 4) & 0xF0) | ((reg_x & 0x03) << 2) | (reg_y & 0x03)
   end
 end
 
