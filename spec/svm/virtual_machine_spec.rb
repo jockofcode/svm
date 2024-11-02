@@ -40,11 +40,11 @@ RSpec.describe Svm::VirtualMachine do
   describe '#run' do
     it 'executes a simple program' do
       program = [
-        0x00, 0x00, 0x00, 0x0A,  # MOV R0, #10
-        0x04, 0x00, 0x00, 0x0E,  # MOV R1, #14
-        0x11, 0x00, 0x00, 0x00,  # ADD R0, R1
-        0x60, 0x00, 0x00, 0x80,  # STORE R0, 129
-        0xE0, 0x00, 0x00, 0x00   # INT #0 (halt)
+        vm.combine_opcode_byte(Svm::InstructionSet::MOV, 0, 0), 0x00, 0x00, 0x0A,  # MOV R0, #10
+        vm.combine_opcode_byte(Svm::InstructionSet::MOV, 1, 0), 0x00, 0x00, 0x0E,  # MOV R1, #14
+        vm.combine_opcode_byte(Svm::InstructionSet::ADD, 0, 1), 0x00, 0x00, 0x00,  # ADD R0, R1
+        vm.combine_opcode_byte(Svm::InstructionSet::STORE, 0, 0), 0x00, 0x00, 0x80,  # STORE R0, 128
+        vm.combine_opcode_byte(Svm::InstructionSet::INT, 0, 0), 0x00, 0x00, 0x00   # INT #0 (halt)
       ]
       vm.load_program(program)
       vm.run()
@@ -98,7 +98,7 @@ RSpec.describe Svm::VirtualMachine do
     end
 
     it 'executes MOV instruction' do
-      vm.load_program([vm.combine_opcode_byte(0,0,0), 0x00, 0x00, 0x0A])  # MOV R0, #10
+      vm.load_program([vm.combine_opcode_byte(Svm::InstructionSet::MOV,0,0), 0x00, 0x00, 0x0A])  # MOV R0, #10
       vm.send(:execute_instruction)
       expect(vm.instance_variable_get(:@registers)[0]).to eq(10)
     end
@@ -247,10 +247,10 @@ RSpec.describe Svm::VirtualMachine do
     it 'handles 16-bit values in registers' do
       vm = Svm::VirtualMachine.new
       program = [
-        0x00, 0x00, 0xFF, 0xFF,  # MOV R0, #65535 (max 16-bit value)
-        0x04, 0x00, 0x00, 0x01,  # MOV R1, #1
-        0x11, 0x00, 0x00, 0x00,  # ADD R0, R1 (0001 0001)
-        0xE0, 0x00, 0x00, 0x00   # INT #0 (halt)
+        vm.combine_opcode_byte(Svm::InstructionSet::MOV, 0, 0), 0x00, 0xFF, 0xFF,  # MOV R0, #65535
+        vm.combine_opcode_byte(Svm::InstructionSet::MOV, 1, 0), 0x00, 0x00, 0x01,  # MOV R1, #1
+        vm.combine_opcode_byte(Svm::InstructionSet::ADD, 0, 1), 0x00, 0x00, 0x00,  # ADD R0, R1
+        vm.combine_opcode_byte(Svm::InstructionSet::INT, 0, 0), 0x00, 0x00, 0x00   # INT #0 (halt)
       ]
       
       vm.load_program(program)
@@ -262,10 +262,10 @@ RSpec.describe Svm::VirtualMachine do
     it 'properly stores and loads 16-bit values' do
       vm = Svm::VirtualMachine.new
       program = [
-        0x00, 0x00, 0x12, 0x34,  # MOV R0, #0x1234
-        0x60, 0x00, 0x00, 0x80,  # STORE R0, 128
-        0x54, 0x00, 0x00, 0x80,  # LOAD R1, 128  (0101 0100 in binary)
-        0xE0, 0x00, 0x00, 0x00   # INT #0 (halt)
+        vm.combine_opcode_byte(Svm::InstructionSet::MOV, 0, 0), 0x00, 0x12, 0x34,  # MOV R0, #0x1234
+        vm.combine_opcode_byte(Svm::InstructionSet::STORE, 0, 0), 0x00, 0x00, 0x80,  # STORE R0, 128
+        vm.combine_opcode_byte(Svm::InstructionSet::LOAD, 1, 0), 0x00, 0x00, 0x80,  # LOAD R1, 128
+        vm.combine_opcode_byte(Svm::InstructionSet::INT, 0, 0), 0x00, 0x00, 0x00   # INT #0 (halt)
       ]
       
       vm.load_program(program)

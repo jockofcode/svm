@@ -13,7 +13,7 @@ RSpec.describe Svm::InstructionSet do
 
   describe 'opcodes' do
     it 'defines all expected opcodes as constants' do
-      expected_opcodes = %w[MOV ADD SUB MUL DIV LOAD STORE JMP JEQ JNE CALL RET PUSH POP INT EXTENDED]
+      expected_opcodes = %w[INT MOV ADD SUB MUL DIV LOAD STORE JMP JEQ JNE CALL RET PUSH POP EXTENDED]
       
       expected_opcodes.each_with_index do |opcode, index|
         expect(Svm::InstructionSet.const_get(opcode)).to eq(index)
@@ -21,9 +21,9 @@ RSpec.describe Svm::InstructionSet do
     end
 
     it 'assigns sequential values starting from 0' do
-      expect(Svm::InstructionSet::MOV).to eq(0)
-      expect(Svm::InstructionSet::ADD).to eq(1)
-      expect(Svm::InstructionSet::SUB).to eq(2)
+      expect(Svm::InstructionSet::INT).to eq(0)
+      expect(Svm::InstructionSet::MOV).to eq(1)
+      expect(Svm::InstructionSet::ADD).to eq(2)
       expect(Svm::InstructionSet::EXTENDED).to eq(15)
     end
   end

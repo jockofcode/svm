@@ -59,21 +59,21 @@ Each instruction is 32 bits (4 bytes) long, with the following format:
 
 | Opcode | Instruction | Description |
 |--------|-------------|-------------|
-| 0000 | MOV | Move value between registers or load an immediate value |
-| 0001 | ADD | Add values of two registers |
-| 0010 | SUB | Subtract values of two registers |
-| 0011 | MUL | Multiply values of two registers |
-| 0100 | DIV | Divide values of two registers |
-| 0101 | LOAD | Load a value from memory to register |
-| 0110 | STORE | Store register value to memory |
-| 0111 | JMP | Unconditional jump to address |
-| 1000 | JEQ | Jump if equal |
-| 1001 | JNE | Jump if not equal |
-| 1010 | CALL | Call subroutine at address |
-| 1011 | RET | Return from subroutine |
-| 1100 | PUSH | Push register value to stack |
-| 1101 | POP | Pop top of stack into register |
-| 1110 | INT | Trigger interrupt for I/O |
+| 0000 | INT | Trigger interrupt for I/O |
+| 0001 | MOV | Move value between registers or load an immediate value |
+| 0010 | ADD | Add values of two registers |
+| 0011 | SUB | Subtract values of two registers |
+| 0100 | MUL | Multiply values of two registers |
+| 0101 | DIV | Divide values of two registers |
+| 0110 | LOAD | Load a value from memory to register |
+| 0111 | STORE | Store register value to memory |
+| 1000 | JMP | Unconditional jump to address |
+| 1001 | JEQ | Jump if equal |
+| 1010 | JNE | Jump if not equal |
+| 1011 | CALL | Call subroutine at address |
+| 1100 | RET | Return from subroutine |
+| 1101 | PUSH | Push register value to stack |
+| 1110 | POP | Pop top of stack into register |
 | 1111 | EXTENDED | Reserved for future instructions |
 
 Note: For instructions with two register operands, the first register is always the destination, and the second register is the source. For single-operand instructions, the register is the destination.

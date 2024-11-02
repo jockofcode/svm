@@ -97,7 +97,10 @@ RSpec.describe Svm::Assembler do
       assembler.send(:second_pass)
 
       machine_code = assembler.instance_variable_get(:@machine_code)
-      expect(machine_code[0..7]).to eq([0x00, 0x00, 0x00, 0x0A, 0x11, 0x00, 0x00, 0x00])
+      expect(machine_code[0..7]).to eq([
+        assembler.combine_opcode_byte(Svm::InstructionSet::MOV, 0, 0), 0x00, 0x00, 0x0A,
+        assembler.combine_opcode_byte(Svm::InstructionSet::ADD, 0, 1), 0x00, 0x00, 0x00
+      ])
     end
   end
 
@@ -179,22 +182,37 @@ RSpec.describe Svm::Assembler do
 
   describe '#combine_opcode_byte' do
     it 'correctly combines ADD opcode with registers' do
-      opcode = Svm::Assembler::ADD
+      opcode = Svm::InstructionSet::ADD
       reg_x = 0  # R0
       reg_y = 1  # R1
 
       result = assembler.send(:combine_opcode_byte, opcode, reg_x, reg_y)
 
-      expect(result).to eq(0x11)  # 0001 0001 in binary
+      expect(result).to eq(0x21)  # 0010 0001 in binary
     end
 
     it 'handles different register combinations for ADD' do
-      opcode = Svm::Assembler::ADD
-      # to ensure proper masking
-      expect(assembler.send(:combine_opcode_byte, opcode, 0, 0)).to eq(0x10)  # ADD R0, R0
-      expect(assembler.send(:combine_opcode_byte, opcode, 1, 2)).to eq(0x16)  # ADD R1, R2
-      expect(assembler.send(:combine_opcode_byte, opcode, 2, 3)).to eq(0x1B)  # ADD R2, R3
-      expect(assembler.send(:combine_opcode_byte, opcode, 3, 1)).to eq(0x1D)  # ADD R3, R1
+      opcode = Svm::InstructionSet::ADD
+      expect(assembler.send(:combine_opcode_byte, opcode, 0, 0)).to eq(0x20)  # ADD R0, R0
+      expect(assembler.send(:combine_opcode_byte, opcode, 1, 2)).to eq(0x26)  # ADD R1, R2
+      expect(assembler.send(:combine_opcode_byte, opcode, 3, 1)).to eq(0x2D)  # ADD R3, R1
+    end
+  end
+
+  describe '#defines_all_expected_opcodes_as_constants' do
+    it 'defines all expected opcodes as constants' do
+      expected_opcodes = %w[INT MOV ADD SUB MUL DIV LOAD STORE JMP JEQ JNE CALL RET PUSH POP EXTENDED]
+      
+      expected_opcodes.each_with_index do |opcode, index|
+        expect(Svm::InstructionSet.const_get(opcode)).to eq(index)
+      end
+    end
+
+    it 'assigns sequential values starting from 0' do
+      expect(Svm::InstructionSet::INT).to eq(0)
+      expect(Svm::InstructionSet::MOV).to eq(1)
+      expect(Svm::InstructionSet::ADD).to eq(2)
+      expect(Svm::InstructionSet::EXTENDED).to eq(15)
     end
   end
 end

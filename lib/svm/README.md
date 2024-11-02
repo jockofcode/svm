@@ -36,21 +36,21 @@ Directives:
 .const defines named constants.
 Instruction Set
 Opcode	Instruction	Description
-0	MOV	Move value between registers or load an immediate value
-1	ADD	Add values of two registers
-2	SUB	Subtract values of two registers
-3	MUL	Multiply values of two registers
-4	DIV	Divide values of two registers
-5	LOAD	Load a value from memory to register
-6	STORE	Store register value to memory
-7	JMP	Unconditional jump to address
-8	JEQ	Jump if equal
-9	JNE	Jump if not equal
-10	CALL	Call subroutine at address
-11	RET	Return from subroutine
-12	PUSH	Push register value to stack
-13	POP	Pop top of stack into register
-14	INT	Trigger interrupt for I/O
+0	INT	Trigger interrupt for I/O
+1	MOV	Move value between registers or load an immediate value
+2	ADD	Add values of two registers
+3	SUB	Subtract values of two registers
+4	MUL	Multiply values of two registers
+5	DIV	Divide values of two registers
+6	LOAD	Load a value from memory to register
+7	STORE	Store register value to memory
+8	JMP	Unconditional jump to address
+9	JEQ	Jump if equal
+10	JNE	Jump if not equal
+11	CALL	Call subroutine at address
+12	RET	Return from subroutine
+13	PUSH	Push register value to stack
+14	POP	Pop top of stack into register
 15	EXTENDED	Reserved for future instructions
 Example Usage
 Writing and Running a Program with the Assembler and Virtual Machine

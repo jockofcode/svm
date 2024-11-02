@@ -7,7 +7,7 @@ module Svm
     REGISTER_MASK = 0xFFFF  # 16-bit mask for registers
 
     # Define opcodes in an array first
-    OPCODES = %w[MOV ADD SUB MUL DIV LOAD STORE JMP JEQ JNE CALL RET PUSH POP INT EXTENDED]
+    OPCODES = %w[INT MOV ADD SUB MUL DIV LOAD STORE JMP JEQ JNE CALL RET PUSH POP EXTENDED]
     
     # Create constants from the array
     OPCODES.each_with_index do |opcode, index|
