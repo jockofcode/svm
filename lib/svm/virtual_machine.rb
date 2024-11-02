@@ -47,6 +47,8 @@ class Svm::VirtualMachine
     end
 
     case opcode
+    when INT
+      handle_interrupt(immediate_value)
     when MOV
       value = reg_y.zero? ? immediate_value : @registers[reg_y]
       @registers[reg_x] = value & REGISTER_MASK
@@ -86,8 +88,6 @@ class Svm::VirtualMachine
       push_word(@registers[reg_x])
     when POP
       @registers[reg_x] = pop_word
-    when INT
-      handle_interrupt(immediate_value)
     when EXTENDED
       return
     end
