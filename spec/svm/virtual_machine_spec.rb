@@ -274,4 +274,33 @@ RSpec.describe Svm::VirtualMachine do
       expect(vm.instance_variable_get(:@registers)[1]).to eq(0x1234)
     end
   end
+
+  describe '#push_word and #pop_word' do
+    it 'maintains stack pointer integrity' do
+      initial_sp = vm.instance_variable_get(:@SP)
+      vm.push_word(42)
+      expect(vm.instance_variable_get(:@SP)).to eq(initial_sp - 1)
+      vm.pop_word
+      expect(vm.instance_variable_get(:@SP)).to eq(initial_sp)
+    end
+
+    it 'handles 16-bit values correctly' do
+      vm.push_word(0xFFFF)  # Max 16-bit value
+      expect(vm.pop_word).to eq(0xFFFF)
+      
+      vm.push_word(0x1234)  # Random 16-bit value
+      expect(vm.pop_word).to eq(0x1234)
+    end
+
+    it 'masks values to 16 bits' do
+      vm.push_word(0x12345)  # Value larger than 16 bits
+      expect(vm.pop_word).to eq(0x2345)  # Should be masked to 16 bits
+    end
+
+    it 'maintains LIFO order with multiple operations' do
+      values = [0xFFFF, 0x1234, 0x5678, 0xABCD]
+      values.each { |v| vm.push_word(v) }
+      expect(values.reverse.map { vm.pop_word }).to eq(values.reverse)
+    end
+  end
 end

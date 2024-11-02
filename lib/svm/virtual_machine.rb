@@ -1,34 +1,28 @@
-class Svm::VirtualMachine 
-  # Constants for memory size and instruction codes
-  MEMORY_SIZE = 4096
-  DISPLAY_START = 128
-  PROGRAM_START = 2048
-  REGISTER_MASK = 0xFFFF  # 16-bit mask for registers
+require_relative 'instruction_set'
 
-  # Instruction set
-  MOV, ADD, SUB, MUL, DIV, LOAD, STORE, JMP, JEQ, JNE, CALL, RET, PUSH, POP, INT, EXTENDED = (0..15).to_a
+class Svm::VirtualMachine 
+  include Svm::InstructionSet
+
   attr_accessor :debug, :memory, :registers, :PC, :SP, :running, :consecutive_mov_r0_0
 
   def initialize
     @memory_size = MEMORY_SIZE
-    @display_start = DISPLAY_START
-    @program_start = PROGRAM_START
     @debug = false
-    @memory = Array.new(@memory_size, 0)      # Memory array
-    @registers = Array.new(4, 0)             # Registers R0..R3 (16-bit each)
-    @PC = @program_start                      # Program Counter
-    @SP = @memory_size - 1                    # Stack Pointer initialized at end of memory
-    @running = true                          # Flag to keep VM running
-    @consecutive_mov_r0_0 = 0               # Counter for consecutive MOV R0, #0
+    @memory = Array.new(@memory_size, 0)
+    @registers = Array.new(4, 0)
+    @PC = PROGRAM_START
+    @SP = MEMORY_SIZE - 1
+    @running = true
+    @consecutive_mov_r0_0 = 0
   end
 
   # Load program into memory at a specified address
-  def load_program(program, start_address = @program_start)
+  def load_program(program, start_address = PROGRAM_START)
     program.each_with_index { |byte, index| @memory[start_address + index] = byte }
   end
 
   # Run the VM, fetching and executing instructions
-  def run(start_address = @program_start)
+  def run(start_address = PROGRAM_START)
     @PC = start_address
     while @running
       execute_instruction
@@ -99,7 +93,7 @@ class Svm::VirtualMachine
     end
 
     @PC += 4 unless @PC != instruction_pc
-    @running = false if @PC >= @memory_size
+    @running = false if @PC >= MEMORY_SIZE
   end
 
   # Stack operations
@@ -119,32 +113,6 @@ class Svm::VirtualMachine
     else
       raise "Unknown interrupt: #{code}"
     end
-  end
-
-  def split_opcode_byte(byte)
-    opcode = (byte & 0xF0) >> 4
-    reg_x = (byte & 0x0C) >> 2
-    reg_y = byte & 0x03
-    [opcode, reg_x, reg_y]
-  end
-
-  def combine_opcode_byte(opcode, reg_x, reg_y)
-    ((opcode << 4) & 0xF0) | ((reg_x & 0x03) << 2) | (reg_y & 0x03)
-  end
-
-  # Modified stack operations for 16-bit values
-  def push_word(value)
-    value = value & REGISTER_MASK  # Ensure 16-bit value
-    @SP -= 2
-    @memory[@SP + 1] = (value >> 8) & 0xFF  # Store high byte
-    @memory[@SP + 2] = value & 0xFF         # Store low byte
-  end
-
-  def pop_word
-    high_byte = @memory[@SP + 1]
-    low_byte = @memory[@SP + 2]
-    @SP += 2
-    ((high_byte << 8) | low_byte) & REGISTER_MASK
   end
 
   def debug_instruction(opcode, reg_x, reg_y, immediate_value)
@@ -186,6 +154,17 @@ class Svm::VirtualMachine
     end
 
     puts "PC: #{@PC.to_s(16).rjust(4, '0')} | #{instruction}"
+  end
+
+  def push_word(value)
+    @SP -= 1
+    @memory[@SP] = value & REGISTER_MASK
+  end
+
+  def pop_word
+    value = @memory[@SP] & REGISTER_MASK
+    @SP += 1
+    value
   end
 end
 
