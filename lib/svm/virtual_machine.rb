@@ -199,8 +199,8 @@ class Svm::VirtualMachine
   def calculate_relative_jump(current_pc, offset)
     # Convert unsigned 16-bit to signed using helper method
     signed_offset = unsigned_to_signed_16bit(offset)
-    # Calculate new PC (current + offset + 4 for instruction size)
-    new_pc = current_pc + signed_offset + 4
+    # Remove the +4 offset to make JMP +0 jump to itself
+    new_pc = current_pc + signed_offset
     new_pc
   end
 
