@@ -112,10 +112,10 @@ RSpec.describe Svm::VirtualMachine do
     end
 
     it 'executes JMP instruction' do
-      target_offset = 769 - (Svm::VirtualMachine::PROGRAM_START + 4)  # Calculate relative offset
+      target_offset = 765 - Svm::VirtualMachine::PROGRAM_START  # Calculate relative offset without +4
       vm.load_program([vm.combine_opcode_byte(Svm::VirtualMachine::JMP,0,0), 0x00, (target_offset >> 8) & 0xFF, target_offset & 0xFF])
       vm.send(:execute_instruction)
-      expect(vm.instance_variable_get(:@PC)).to eq(769)
+      expect(vm.instance_variable_get(:@PC)).to eq(765)
     end
 
     it 'executes STORE instruction' do
@@ -156,26 +156,26 @@ RSpec.describe Svm::VirtualMachine do
 
     it 'executes JEQ instruction when equal' do
       vm.instance_variable_set(:@registers, [5, 5, 0, 0])
-      target_offset = 1030 - (Svm::VirtualMachine::PROGRAM_START + 4)  # Calculate relative offset
+      target_offset = 1026 - Svm::VirtualMachine::PROGRAM_START  # For JEQ when equal
       vm.load_program([vm.combine_opcode_byte(Svm::VirtualMachine::JEQ,0,1), 0x00, (target_offset >> 8) & 0xFF, target_offset & 0xFF])
       vm.send(:execute_instruction)
-      expect(vm.instance_variable_get(:@PC)).to eq(1030)
+      expect(vm.instance_variable_get(:@PC)).to eq(1026)
     end
 
     it 'executes JEQ instruction when not equal' do
       vm.instance_variable_set(:@registers, [5, 6, 0, 0])
-      target_offset = 1029 - (Svm::VirtualMachine::PROGRAM_START + 4)  # Calculate relative offset
+      target_offset = 1025 - Svm::VirtualMachine::PROGRAM_START  # For JNE tests
       vm.load_program([vm.combine_opcode_byte(Svm::VirtualMachine::JNE,0,1), 0x00, (target_offset >> 8) & 0xFF, target_offset & 0xFF])
       vm.send(:execute_instruction)
-      expect(vm.instance_variable_get(:@PC)).to eq(1029)
+      expect(vm.instance_variable_get(:@PC)).to eq(1025)
     end
 
     it 'executes JNE instruction when not equal' do
       vm.instance_variable_set(:@registers, [5, 6, 0, 0])
-      target_offset = 1029 - (Svm::VirtualMachine::PROGRAM_START + 4)  # Calculate relative offset
+      target_offset = 1025 - Svm::VirtualMachine::PROGRAM_START  # For JNE tests
       vm.load_program([vm.combine_opcode_byte(Svm::VirtualMachine::JNE,0,1), 0x00, (target_offset >> 8) & 0xFF, target_offset & 0xFF])
       vm.send(:execute_instruction)
-      expect(vm.instance_variable_get(:@PC)).to eq(1029)
+      expect(vm.instance_variable_get(:@PC)).to eq(1025)
     end
 
     it 'executes JNE instruction when equal' do
@@ -309,10 +309,9 @@ RSpec.describe Svm::VirtualMachine do
 
   describe 'relative jumps' do
     it 'handles forward relative jumps' do
-      # JMP +8 (skip next instruction)
       program = [
         vm.combine_opcode_byte(Svm::InstructionSet::MOV, 0, 0), 0x00, 0x00, 0x0A,   # MOV R0, #10
-        vm.combine_opcode_byte(Svm::InstructionSet::JMP, 0, 0), 0x00, 0x00, 0x04,   # JMP +4
+        vm.combine_opcode_byte(Svm::InstructionSet::JMP, 0, 0), 0x00, 0x00, 0x08,   # JMP +8 (skip next instruction)
         vm.combine_opcode_byte(Svm::InstructionSet::MOV, 0, 0), 0x00, 0x00, 0x14,   # MOV R0, #20 (skipped)
         vm.combine_opcode_byte(Svm::InstructionSet::INT, 0, 0), 0x00, 0x00, 0x01    # INT #1 (print R0)
       ]
@@ -332,7 +331,7 @@ RSpec.describe Svm::VirtualMachine do
         vm.combine_opcode_byte(Svm::InstructionSet::MOV, 1, 0), 0x00, 0x00, 0x01,   # MOV R1, #1
         vm.combine_opcode_byte(Svm::InstructionSet::SUB, 0, 1), 0x00, 0x00, 0x00,   # SUB R0, R1
         vm.combine_opcode_byte(Svm::InstructionSet::MOV, 1, 0), 0x00, 0x00, 0x00,   # MOV R1, #0
-        vm.combine_opcode_byte(Svm::InstructionSet::JNE, 0, 1), 0x00, 0xFF, 0xEC,   # JNE R0, R1, -20 (jump back to INT)
+        vm.combine_opcode_byte(Svm::InstructionSet::JNE, 0, 1), 0x00, 0xFF, 0xF0,   # JNE R0, R1, -16 (jump back to INT)
         vm.combine_opcode_byte(Svm::InstructionSet::INT, 0, 0), 0x00, 0x00, 0x00    # INT #0 (halt)
       ]
       vm.load_program(program)

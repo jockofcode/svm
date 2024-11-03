@@ -164,8 +164,8 @@ class Svm::Assembler
       
       # For jump instructions, calculate relative offset
       if @current_instruction && [:JMP, :JEQ, :JNE, :CALL].include?(@current_instruction.to_sym)
-        # Calculate offset to skip the entire next instruction
-        offset = target_address - address
+        # Add 4 to address to account for instruction size when calculating offset
+        offset = target_address - (address + 4)
         return offset
       end
       

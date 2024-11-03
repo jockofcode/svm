@@ -39,10 +39,10 @@ RSpec.describe Svm::Assembler do
       machine_code = assembler.assemble(assembly_code)
 
       expect(machine_code[0..15]).to eq([
-        assembler.combine_opcode_byte(Svm::InstructionSet::JMP, 0, 0), 0x00, 0x00, 0x08,  # JMP +8 (forward to START)
+        assembler.combine_opcode_byte(Svm::InstructionSet::JMP, 0, 0), 0x00, 0x00, 0x04,  # JMP +4 (forward to START)
         assembler.combine_opcode_byte(Svm::InstructionSet::MOV, 1, 0), 0x00, 0x00, 0x0A,  # MOV R1, #10 (skipped)
         assembler.combine_opcode_byte(Svm::InstructionSet::MOV, 0, 0), 0x00, 0x00, 0x05,  # MOV R0, #5 (START)
-        assembler.combine_opcode_byte(Svm::InstructionSet::JMP, 0, 0), 0x00, 0x00, 0x08   # JMP +8 (forward to END)
+        assembler.combine_opcode_byte(Svm::InstructionSet::JMP, 0, 0), 0x00, 0x00, 0x04   # JMP +4 (forward to END)
       ])
     end
 
@@ -235,7 +235,7 @@ RSpec.describe Svm::Assembler do
       machine_code = assembler.assemble(assembly_code)
       
       expect(machine_code[4..7]).to eq([
-        assembler.combine_opcode_byte(Svm::InstructionSet::JMP, 0, 0), 0x00, 0x00, 0x08  # JMP +8 (skip next instruction)
+        assembler.combine_opcode_byte(Svm::InstructionSet::JMP, 0, 0), 0x00, 0x00, 0x04  # JMP +4 (skip next instruction)
       ])
     end
 
@@ -251,7 +251,7 @@ RSpec.describe Svm::Assembler do
       machine_code = assembler.assemble(assembly_code)
       
       expect(machine_code[8..11]).to eq([
-        assembler.combine_opcode_byte(Svm::InstructionSet::JNE, 0, 0), 0x00, 0xFF, 0xF8  # JNE -8 (jump back to START)
+        assembler.combine_opcode_byte(Svm::InstructionSet::JNE, 0, 0), 0x00, 0xFF, 0xF4  # JNE -12 (jump back to START)
       ])
     end
   end
