@@ -135,10 +135,25 @@ class Svm::Assembler
       value = parse_value(operands[0], address)
     elsif operands.size == 2
       reg_x = parse_register(operands[0])
-      if REGISTERS.key?(operands[1])
-        reg_y = parse_register(operands[1])
+      
+      # Special handling for MOV instruction
+      if @current_instruction == 'MOV'
+        if operands[1].start_with?('#') || !REGISTERS.key?(operands[1])
+          # Immediate mode - either starts with # or is a constant/label
+          value = parse_value(operands[1], address)
+          reg_y = 0  # Set reg_y to 0 for immediate mode
+        else
+          # Register mode
+          reg_y = parse_register(operands[1])
+          value = 0  # Value not used in register mode
+        end
       else
-        value = parse_value(operands[1], address)
+        # Default behavior for other instructions
+        if REGISTERS.key?(operands[1])
+          reg_y = parse_register(operands[1])
+        else
+          value = parse_value(operands[1], address)
+        end
       end
     elsif operands.size == 3
       reg_x = parse_register(operands[0])

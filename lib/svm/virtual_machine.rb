@@ -1,4 +1,5 @@
 require_relative 'instruction_set'
+require_relative 'socket_tty_connection'
 
 class Svm::VirtualMachine 
   include Svm::InstructionSet
@@ -17,6 +18,7 @@ class Svm::VirtualMachine
     @consecutive_mov_r0_0 = 0
     @instruction_limit = nil
     @instruction_count = 0
+    @tty = Svm::SocketTtyConnection.new
   end
 
   def enable_debug(output = $stdout)
@@ -118,20 +120,23 @@ class Svm::VirtualMachine
 
   # Stack operations
   # Interrupt handler (basic I/O)
-  def handle_interrupt(code)
-    case code
-    when 0
+  def handle_interrupt(number)
+    case number
+    when 0  # Halt
       @running = false
-    when 1
+    when 1  # Output
       puts "Output: #{@registers[0]}"
-    when 2
-      @memory[@registers[0] & REGISTER_MASK] = getc
-    when 3
-      puts @memory[@registers[0]..@registers[1]]
-    when 4
-      @memory[@registers[0]] = @registers[1] == 0 ? gets(@memory_size - @registers[0]).chomp : gets(@registers[1]).chomp
+    when 2  # TTY Input
+      if @tty&.byte_available?
+        @registers[0] = @tty.read_byte
+      else
+        @registers[0] = 0
+        sleep 0.01  # Add small sleep to prevent tight loop
+      end
+    when 3  # TTY Output
+      @tty&.write_byte(@registers[0])
     else
-      raise "Unknown interrupt: #{code}"
+      raise "Unknown interrupt: #{number}"
     end
   end
 
@@ -212,6 +217,14 @@ class Svm::VirtualMachine
   def clear_instruction_limit
     @instruction_limit = nil
     @instruction_count = 0
+  end
+
+  def start_tty
+    @tty.start
+  end
+
+  def stop_tty
+    @tty.stop
   end
 
   private

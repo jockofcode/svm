@@ -1,0 +1,49 @@
+#!/usr/bin/env ruby
+
+require 'socket'
+require 'io/console'
+
+class TerminalClient
+  def initialize(host = 'localhost', port = 4567)
+    @host = host
+    @port = port
+  end
+
+  def start
+    @socket = TCPSocket.new(@host, @port)
+    start_input_thread
+    start_output_thread
+    wait_for_exit
+  end
+
+  private
+
+  def start_input_thread
+    @input_thread = Thread.new do
+      while char = STDIN.getch
+        @socket.write(char)
+        break if char == "\u0003" # Ctrl+C
+      end
+    end
+  end
+
+  def start_output_thread
+    @output_thread = Thread.new do
+      while char = @socket.read(1)
+        print char
+        STDOUT.flush
+      end
+    end
+  end
+
+  def wait_for_exit
+    @input_thread.join
+  ensure
+    @socket.close
+  end
+end
+
+if __FILE__ == $0
+  client = TerminalClient.new
+  client.start
+end 
