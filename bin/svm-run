@@ -44,15 +44,24 @@ end
 
 begin
   # Read binary file
+<<<<<<< Updated upstream
   program = File.read(input_file).unpack('C*')
+=======
+  binary_data = File.read(input_file).unpack('C*')
+>>>>>>> Stashed changes
   
   # Create and configure VM
   vm = Svm::VirtualMachine.new
   vm.enable_debug if options[:debug]
   vm.set_instruction_limit(options[:limit]) if options[:limit]
   
+<<<<<<< Updated upstream
   # Load program
   vm.load_program(program, options[:start_address])
+=======
+  # Load binary with metadata
+  vm.load_binary(binary_data, options[:start_address])
+>>>>>>> Stashed changes
   
   # Start TTY service
   vm.start_tty
