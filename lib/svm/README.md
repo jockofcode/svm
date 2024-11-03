@@ -8,6 +8,7 @@ Components
 Virtual Machine
 Assembler
 Instruction Set
+Interrupts
 Example Usage
 License
 Installation
@@ -37,7 +38,7 @@ Directives:
 Instruction Set
 Opcode	Instruction	Description
 0	INT	Trigger interrupt for I/O
-1	MOV	Move value between registers or load an immediate value
+1	MOV	Load an immediate value into register
 2	ADD	Add values of two registers
 3	SUB	Subtract values of two registers
 4	MUL	Multiply values of two registers
@@ -52,6 +53,16 @@ Opcode	Instruction	Description
 13	PUSH	Push register value to stack
 14	POP	Pop top of stack into register
 15	EXTENDED	Reserved for future instructions
+Interrupts
+The SVM supports several interrupts for I/O operations and program control:
+
+| Interrupt | Description |
+|-----------|-------------|
+| INT #0    | Halt - Stops program execution |
+| INT #1    | Output - Prints value in R0 to stdout |
+| INT #2    | Input - Reads a character from TTY into R0 |
+| INT #3    | Output - Writes character in R0 to TTY |
+
 Example Usage
 Writing and Running a Program with the Assembler and Virtual Machine
 ```ruby
