@@ -1,0 +1,73 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+require_relative '../lib/svm/virtual_machine'
+
+options = {
+  start_address: Svm::VirtualMachine::PROGRAM_START,
+  debug: false
+}
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: svm-run [options] <program.bin>"
+  
+  opts.on("-s", "--start-address ADDRESS", Integer, "Start address (default: #{options[:start_address]})") do |addr|
+    options[:start_address] = addr
+  end
+  
+  opts.on("-d", "--debug", "Enable debug output") do |d|
+    options[:debug] = d
+  end
+  
+  opts.on("-l", "--limit INSTRUCTIONS", Integer, "Set instruction execution limit") do |limit|
+    options[:limit] = limit
+  end
+  
+  opts.on("-h", "--help", "Show this help message") do
+    puts opts
+    exit
+  end
+end.parse!
+
+if ARGV.length != 1
+  puts "Error: Please provide a binary file path"
+  puts "Usage: svm-run [options] <program.bin>"
+  exit 1
+end
+
+input_file = ARGV[0]
+
+unless File.exist?(input_file)
+  puts "Error: Input file '#{input_file}' not found"
+  exit 1
+end
+
+begin
+  # Read binary file
+  program = File.read(input_file).unpack('C*')
+  
+  # Create and configure VM
+  vm = Svm::VirtualMachine.new
+  vm.enable_debug if options[:debug]
+  vm.set_instruction_limit(options[:limit]) if options[:limit]
+  
+  # Load program
+  vm.load_program(program, options[:start_address])
+  
+  # Start TTY service
+  vm.start_tty
+  
+  begin
+    # Run VM
+    vm.run(options[:start_address])
+  rescue => e
+    puts "\nVM Error: #{e.message}"
+  ensure
+    # Clean up TTY
+    vm.stop_tty
+  end
+  
+rescue => e
+  puts "Error: #{e.message}"
+  exit 1
+end 

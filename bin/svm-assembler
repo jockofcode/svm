@@ -1,0 +1,53 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+require_relative '../lib/svm/assembler'
+
+options = {}
+OptionParser.new do |opts|
+  opts.banner = "Usage: svm-assembler [options] <input.asm> <output.bin>"
+  
+  opts.on("-v", "--verbose", "Run verbosely") do |v|
+    options[:verbose] = v
+  end
+  
+  opts.on("-h", "--help", "Show this help message") do
+    puts opts
+    exit
+  end
+end.parse!
+
+if ARGV.length != 2
+  puts "Error: Please provide input and output file paths"
+  puts "Usage: svm-assembler [options] <input.asm> <output.bin>"
+  exit 1
+end
+
+input_file = ARGV[0]
+output_file = ARGV[1]
+
+unless File.exist?(input_file)
+  puts "Error: Input file '#{input_file}' not found"
+  exit 1
+end
+
+begin
+  # Read assembly source
+  source = File.read(input_file)
+  puts "Reading assembly from #{input_file}..." if options[:verbose]
+  
+  # Create assembler and assemble code
+  assembler = Svm::Assembler.new
+  machine_code = assembler.assemble(source)
+  puts "Assembly completed successfully" if options[:verbose]
+  
+  # Write binary output
+  File.open(output_file, 'wb') do |file|
+    machine_code.each { |byte| file.write([byte].pack('C')) }
+  end
+  puts "Binary written to #{output_file}" if options[:verbose]
+  
+rescue => e
+  puts "Error during assembly: #{e.message}"
+  exit 1
+end 
