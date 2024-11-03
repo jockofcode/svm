@@ -11,6 +11,7 @@ The Simple Virtual Machine (SVM) is a lightweight register-based virtual machine
   - [Virtual Machine](#virtual-machine)
   - [Assembler](#assembler)
 - [Instruction Set](#instruction-set)
+- [Interrupts](#interrupts)
 - [Example Usage](#example-usage)
 - [License](#license)
 
@@ -60,7 +61,7 @@ Each instruction is 32 bits (4 bytes) long, with the following format:
 | Opcode | Instruction | Description |
 |--------|-------------|-------------|
 | 0000 | INT | Trigger interrupt for I/O |
-| 0001 | MOV | Move value between registers or load an immediate value |
+| 0001 | MOV | Load an immediate value into register |
 | 0010 | ADD | Add values of two registers |
 | 0011 | SUB | Subtract values of two registers |
 | 0100 | MUL | Multiply values of two registers |
@@ -77,6 +78,34 @@ Each instruction is 32 bits (4 bytes) long, with the following format:
 | 1111 | EXTENDED | Reserved for future instructions |
 
 Note: For instructions with two register operands, the first register is always the destination, and the second register is the source. For single-operand instructions, the register is the destination.
+
+## Interrupts
+
+The SVM provides several interrupt operations for I/O and program control:
+
+| Interrupt | Operation | Description |
+|-----------|-----------|-------------|
+| INT #0    | Halt      | Stops program execution |
+| INT #1    | Print     | Prints value in R0 to stdout (prints "Output: <value>") |
+| INT #2    | Read TTY  | Reads a character from TTY into R0 |
+| INT #3    | Write TTY | Writes character in R0 to TTY |
+
+Example interrupt usage:
+
+```asm
+; Basic output example
+MOV R0, #65      ; Load ASCII 'A' into R0
+INT #3           ; Write 'A' to TTY
+INT #0           ; Halt program
+
+; TTY echo example
+START:
+  INT #2         ; Read character from TTY into R0
+  INT #3         ; Write character to TTY
+  JMP START      ; Loop forever
+```
+
+Note: TTY operations (INT #2 and INT #3) require starting the VM's TTY connection using `vm.start_tty` before execution.
 
 ## Example Usage
 
